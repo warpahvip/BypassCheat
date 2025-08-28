@@ -1,0 +1,260 @@
+-- Auto Teleport Script untuk Delta Executor Android
+-- Dibuat untuk teleport berurutan dengan GUI kontrol (TANPA AUTO LOOP)
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Daftar koordinat berurutan
+local coordinates = {
+    {X = 868, Y = 208, Z = 132},
+    {X = 782, Y = 340, Z = -1},
+    {X = 412, Y = 428, Z = -39},
+    {X = 259, Y = 612, Z = -275},
+    {X = 270, Y = 652, Z = -453},
+    {X = 31, Y = 688, Z = -459},
+    {X = -251, Y = 684, Z = -449},
+    {X = -553, Y = 724, Z = -383},
+    {X = -560, Y = 785, Z = -588},
+    {X = -475, Y = 904, Z = -763},
+    {X = -75, Y = 893, Z = -766},
+    {X = 338, Y = 1069, Z = -932},
+    {X = 434, Y = 1285, Z = -807},
+    {X = 671, Y = 1665, Z = -852},
+    {X = 631, Y = 1877, Z = -744},
+    {X = 960, Y = 1881, Z = -867},
+    {X = 988, Y = 1954, Z = -498}
+}
+
+-- Variabel kontrol
+local isRunning = false
+local currentIndex = 1
+local connection
+local isCompleted = false
+
+-- Fungsi untuk teleport ke koordinat
+local function teleportToCoordinate(coord)
+    if character and humanoidRootPart then
+        local newPosition = Vector3.new(coord.X, coord.Y, coord.Z)
+        humanoidRootPart.CFrame = CFrame.new(newPosition)
+        print("Teleported to: X=" .. coord.X .. " Y=" .. coord.Y .. " Z=" .. coord.Z)
+    end
+end
+
+-- Fungsi utama loop teleport
+local function startTeleportLoop()
+    if connection then
+        connection:Disconnect()
+    end
+    
+    local lastTime = tick()
+    connection = RunService.Heartbeat:Connect(function()
+        if not isRunning or isCompleted then return end
+        
+        -- Tentukan delay berdasarkan posisi koordinat
+        local requiredDelay = 4 -- Default delay 4 detik
+        if currentIndex == #coordinates then
+            requiredDelay = 5 -- Delay 5 detik untuk koordinat terakhir
+        end
+        
+        -- Check jika sudah mencapai delay yang diperlukan
+        if tick() - lastTime >= requiredDelay then
+            -- Update character reference jika respawn
+            character = player.Character
+            if character then
+                humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart then
+                    -- Teleport ke koordinat saat ini
+                    teleportToCoordinate(coordinates[currentIndex])
+                    
+                    -- Pindah ke koordinat berikutnya
+                    currentIndex = currentIndex + 1
+                    
+                    -- Berhenti jika sudah mencapai akhir (TIDAK AUTO LOOP)
+                    if currentIndex > #coordinates then
+                        isCompleted = true
+                        isRunning = false
+                        print("Semua koordinat telah selesai! Script berhenti.")
+                        if connection then
+                            connection:Disconnect()
+                            connection = nil
+                        end
+                        return
+                    end
+                    
+                    lastTime = tick()
+                end
+            end
+        end
+    end)
+end
+
+-- Fungsi untuk stop teleport
+local function stopTeleportLoop()
+    isRunning = false
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    print("Teleport dihentikan")
+end
+
+-- Fungsi untuk reset script
+local function resetScript()
+    stopTeleportLoop()
+    currentIndex = 1
+    isCompleted = false
+    print("Script direset, siap untuk dijalankan ulang")
+end
+
+-- Update character saat respawn
+player.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    print("Character respawned, referensi diperbarui")
+end)
+
+-- Membuat GUI
+local screenGui = Instance.new("ScreenGui")
+local mainFrame = Instance.new("Frame")
+local titleLabel = Instance.new("TextLabel")
+local startButton = Instance.new("TextButton")
+local stopButton = Instance.new("TextButton")
+local resetButton = Instance.new("TextButton")
+local statusLabel = Instance.new("TextLabel")
+local coordLabel = Instance.new("TextLabel")
+
+-- Konfigurasi ScreenGui
+screenGui.Name = "TeleportGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Konfigurasi Main Frame
+mainFrame.Name = "MainFrame"
+mainFrame.Parent = screenGui
+mainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+mainFrame.BorderColor3 = Color3.fromRGB(0, 162, 255)
+mainFrame.BorderSizePixel = 2
+mainFrame.Position = UDim2.new(0, 10, 0, 10)
+mainFrame.Size = UDim2.new(0, 280, 0, 200)
+mainFrame.Active = true
+mainFrame.Draggable = true
+
+-- Title Label
+titleLabel.Name = "TitleLabel"
+titleLabel.Parent = mainFrame
+titleLabel.BackgroundTransparency = 1
+titleLabel.Position = UDim2.new(0, 0, 0, 0)
+titleLabel.Size = UDim2.new(1, 0, 0, 30)
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.Text = "Auto Teleport Script"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextSize = 16
+
+-- Start Button
+startButton.Name = "StartButton"
+startButton.Parent = mainFrame
+startButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+startButton.BorderSizePixel = 0
+startButton.Position = UDim2.new(0, 10, 0, 40)
+startButton.Size = UDim2.new(0, 80, 0, 35)
+startButton.Font = Enum.Font.SourceSansBold
+startButton.Text = "START"
+startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+startButton.TextSize = 14
+
+-- Stop Button
+stopButton.Name = "StopButton"
+stopButton.Parent = mainFrame
+stopButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+stopButton.BorderSizePixel = 0
+stopButton.Position = UDim2.new(0, 100, 0, 40)
+stopButton.Size = UDim2.new(0, 80, 0, 35)
+stopButton.Font = Enum.Font.SourceSansBold
+stopButton.Text = "STOP"
+stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopButton.TextSize = 14
+
+-- Reset Button
+resetButton.Name = "ResetButton"
+resetButton.Parent = mainFrame
+resetButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+resetButton.BorderSizePixel = 0
+resetButton.Position = UDim2.new(0, 190, 0, 40)
+resetButton.Size = UDim2.new(0, 80, 0, 35)
+resetButton.Font = Enum.Font.SourceSansBold
+resetButton.Text = "RESET"
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.TextSize = 14
+
+-- Status Label
+statusLabel.Name = "StatusLabel"
+statusLabel.Parent = mainFrame
+statusLabel.BackgroundTransparency = 1
+statusLabel.Position = UDim2.new(0, 10, 0, 85)
+statusLabel.Size = UDim2.new(1, -20, 0, 25)
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.Text = "Status: Stopped"
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.TextSize = 12
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Coordinate Label
+coordLabel.Name = "CoordLabel"
+coordLabel.Parent = mainFrame
+coordLabel.BackgroundTransparency = 1
+coordLabel.Position = UDim2.new(0, 10, 0, 110)
+coordLabel.Size = UDim2.new(1, -20, 0, 80)
+coordLabel.Font = Enum.Font.SourceSans
+coordLabel.Text = "Total Koordinat: " .. #coordinates .. "\nDelay: 4 detik (5 detik terakhir)\nMode: Single Run (No Loop)\nKlik RESET untuk menjalankan ulang"
+coordLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+coordLabel.TextSize = 11
+coordLabel.TextXAlignment = Enum.TextXAlignment.Left
+coordLabel.TextYAlignment = Enum.TextYAlignment.Top
+
+-- Event Handlers
+startButton.MouseButton1Click:Connect(function()
+    if not isRunning and not isCompleted then
+        isRunning = true
+        statusLabel.Text = "Status: Running (Koordinat " .. currentIndex .. "/" .. #coordinates .. ")"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        startTeleportLoop()
+        print("Teleport dimulai!")
+    elseif isCompleted then
+        print("Script sudah selesai! Gunakan tombol RESET untuk menjalankan ulang.")
+    end
+end)
+
+stopButton.MouseButton1Click:Connect(function()
+    stopTeleportLoop()
+    statusLabel.Text = "Status: Stopped"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+end)
+
+resetButton.MouseButton1Click:Connect(function()
+    resetScript()
+    statusLabel.Text = "Status: Reset - Siap dijalankan"
+    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+end)
+
+-- Update status label secara berkala
+spawn(function()
+    while wait(0.5) do
+        if isRunning and not isCompleted then
+            statusLabel.Text = "Status: Running (Koordinat " .. currentIndex .. "/" .. #coordinates .. ")"
+        elseif isCompleted then
+            statusLabel.Text = "Status: Completed - Gunakan RESET"
+            statusLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+        end
+    end
+end)
+
+print("=== Auto Teleport Script Loaded ===")
+print("Total koordinat: " .. #coordinates)
+print("Gunakan tombol START/STOP/RESET pada GUI untuk mengontrol")
+print("Script akan berhenti setelah koordinat terakhir")
+print("Gunakan RESET untuk menjalankan ulang dari awal")
+print("Support Delta Executor Android")
