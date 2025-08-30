@@ -1,0 +1,246 @@
+-- main.lua
+
+--[[ 
+📦 Script Terbang Enhanced dengan Radiant Body
+Features:
+- Fly system dengan kontrol arah (layout original)
+- Radiant body dengan pengaturan brightness (tombol kecil di atas)
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "FlySimpleUI"
+gui.ResetOnSpawn = false
+
+local function createBtn(name, pos, text)
+	local btn = Instance.new("TextButton", gui)
+	btn.Name = name
+	btn.Size = UDim2.new(0, 60, 0, 60)
+	btn.Position = pos
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Text = text
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+	return btn
+end
+
+-- Function untuk membuat tombol kecil radiant
+local function createSmallBtn(name, pos, size, text)
+	local btn = Instance.new("TextButton", gui)
+	btn.Name = name
+	btn.Size = size
+	btn.Position = pos
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Text = text
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	return btn
+end
+
+-- Original fly buttons (unchanged positions)
+local btns = {
+	Forward = createBtn("Forward", UDim2.new(0, 90, 1, -170), "↑"),
+	Backward = createBtn("Backward", UDim2.new(0, 90, 1, -60), "↓"),
+	Left = createBtn("Left", UDim2.new(0, 30, 1, -115), "←"),
+	Right = createBtn("Right", UDim2.new(0, 150, 1, -115), "→"),
+	Up = createBtn("Up", UDim2.new(1, -160, 1, -170), "⬆"),
+	Down = createBtn("Down", UDim2.new(1, -160, 1, -60), "⬇"),
+	Toggle = createBtn("Toggle", UDim2.new(1, -170, 0, 40), "Fly OFF"),
+	Close = createBtn("Close", UDim2.new(1, -100, 0, 40), "X")
+}
+
+-- Small radiant body controls (positioned above fly controls)
+local radiantBtns = {
+	RadiantToggle = createSmallBtn("RadiantToggle", UDim2.new(0, 30, 1, -220), UDim2.new(0, 80, 0, 35), "Light OFF"),
+	BrightnessDown = createSmallBtn("BrightnessDown", UDim2.new(0, 120, 1, -220), UDim2.new(0, 30, 0, 35), "-"),
+	BrightnessUp = createSmallBtn("BrightnessUp", UDim2.new(0, 160, 1, -220), UDim2.new(0, 30, 0, 35), "+")
+}
+
+-- Brightness label
+local brightnessLabel = Instance.new("TextLabel", gui)
+brightnessLabel.Name = "BrightnessLabel"
+brightnessLabel.Size = UDim2.new(0, 100, 0, 20)
+brightnessLabel.Position = UDim2.new(0, 95, 1, -250)
+brightnessLabel.BackgroundTransparency = 1
+brightnessLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+brightnessLabel.Text = "Brightness: 1.0"
+brightnessLabel.TextScaled = true
+brightnessLabel.Font = Enum.Font.Gotham
+
+-- Variables
+local flying = false
+local radiantEnabled = false
+local brightness = 1.0
+local move = {
+	Forward = false, Backward = false,
+	Left = false, Right = false,
+	Up = false, Down = false
+}
+local speed = 60
+local force
+local connections = {}
+local radiantParts = {}
+
+-- Radiant Body Functions
+local function createRadiantBody()
+	if radiantParts and #radiantParts > 0 then return end
+	
+	radiantParts = {}
+	for _, part in pairs(char:GetChildren()) do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			local light = Instance.new("PointLight")
+			light.Brightness = brightness
+			light.Range = 15
+			light.Color = Color3.fromRGB(255, 255, 150)
+			light.Parent = part
+			table.insert(radiantParts, light)
+		end
+	end
+end
+
+local function removeRadiantBody()
+	for _, light in pairs(radiantParts) do
+		if light and light.Parent then
+			light:Destroy()
+		end
+	end
+	radiantParts = {}
+end
+
+local function updateRadiantBrightness()
+	for _, light in pairs(radiantParts) do
+		if light and light.Parent then
+			light.Brightness = brightness
+		end
+	end
+	brightnessLabel.Text = "Brightness: " .. string.format("%.1f", brightness)
+end
+
+-- Toggle Fly
+table.insert(connections, btns.Toggle.MouseButton1Click:Connect(function()
+	flying = not flying
+	btns.Toggle.Text = flying and "Fly ON" or "Fly OFF"
+
+	if flying then
+		force = Instance.new("BodyForce", hrp)
+	else
+		if force then force:Destroy() end
+		hrp.Velocity = Vector3.zero
+	end
+end))
+
+-- Radiant Toggle
+table.insert(connections, radiantBtns.RadiantToggle.MouseButton1Click:Connect(function()
+	radiantEnabled = not radiantEnabled
+	radiantBtns.RadiantToggle.Text = radiantEnabled and "Light ON" or "Light OFF"
+	radiantBtns.RadiantToggle.BackgroundColor3 = radiantEnabled and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(60, 60, 60)
+	
+	if radiantEnabled then
+		createRadiantBody()
+	else
+		removeRadiantBody()
+	end
+end))
+
+-- Brightness Controls
+table.insert(connections, radiantBtns.BrightnessDown.MouseButton1Click:Connect(function()
+	if brightness > 0.2 then
+		brightness = math.max(0.2, brightness - 0.2)
+		updateRadiantBrightness()
+	end
+end))
+
+table.insert(connections, radiantBtns.BrightnessUp.MouseButton1Click:Connect(function()
+	if brightness < 5.0 then
+		brightness = math.min(5.0, brightness + 0.2)
+		updateRadiantBrightness()
+	end
+end))
+
+-- Close Button (Kill Script)
+table.insert(connections, btns.Close.MouseButton1Click:Connect(function()
+	-- Matikan fly
+	flying = false
+	btns.Toggle.Text = "Fly OFF"
+	if force then force:Destroy() end
+	hrp.Velocity = Vector3.zero
+	
+	-- Matikan radiant
+	radiantEnabled = false
+	removeRadiantBody()
+
+	-- Putus semua koneksi
+	for _, conn in pairs(connections) do
+		pcall(function() conn:Disconnect() end)
+	end
+
+	-- Hancurkan GUI
+	gui:Destroy()
+
+	-- Bersihkan memori
+	force = nil
+	move = nil
+	btns = nil
+	radiantBtns = nil
+	radiantParts = nil
+end))
+
+-- Tombol gerakan
+for dir, btn in pairs(btns) do
+	if move[dir] ~= nil then
+		table.insert(connections, btn.MouseButton1Down:Connect(function()
+			move[dir] = true
+			btn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+		end))
+		table.insert(connections, btn.MouseButton1Up:Connect(function()
+			move[dir] = false
+			btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		end))
+	end
+end
+
+-- Loop Fly
+local flyLoop
+flyLoop = RunService.RenderStepped:Connect(function()
+	if not flying then return end
+	local camCF = workspace.CurrentCamera.CFrame
+	local dir = Vector3.zero
+
+	if move.Forward then dir += camCF.LookVector end
+	if move.Backward then dir -= camCF.LookVector end
+	if move.Left then dir -= camCF.RightVector end
+	if move.Right then dir += camCF.RightVector end
+	if move.Up then dir += camCF.UpVector end
+	if move.Down then dir -= camCF.UpVector end
+
+	if force then
+		force.Force = Vector3.new(0, workspace.Gravity * hrp.AssemblyMass, 0)
+	end
+	hrp.Velocity = dir.Magnitude > 0 and dir.Unit * speed or Vector3.zero
+end)
+table.insert(connections, flyLoop)
+
+-- Character respawn handler
+table.insert(connections, player.CharacterAdded:Connect(function(newChar)
+	char = newChar
+	hrp = newChar:WaitForChild("HumanoidRootPart")
+	
+	-- Reset states
+	flying = false
+	radiantEnabled = false
+	btns.Toggle.Text = "Fly OFF"
+	radiantBtns.RadiantToggle.Text = "Light OFF"
+	radiantBtns.RadiantToggle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	
+	if force then force:Destroy() end
+	removeRadiantBody()
+end))
